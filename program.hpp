@@ -78,7 +78,7 @@ public:
 
 class program{
 public:
-    uint32_t pc, next_pc;
+    uint32_t pc, next_pc, prev_pc;
     uint32_t reg[32];
     uint8_t mem[1 << 17];
     long long counter = 0;
@@ -94,8 +94,8 @@ public:
     }
 
     void prepare_mem(){
-        //ifstream fin("/home/spectrometer/Arch2018/riscv/test/test.data");
-        ifstream fin("/home/spectrometer/Chaos/data/test.data");
+        ifstream fin("/home/spectrometer/Arch2018/riscv/test/test.data");
+        //ifstream fin("/home/spectrometer/Chaos/data/test.data");
         string s;
         uint32_t addr = 0;
         while (fin >> s){
@@ -133,6 +133,7 @@ public:
 
     void mem_w(int addr, uint8_t x){
         printf("write %#X to mem[%#X]\n", x, addr);
+        if (addr >= (1 << 17)) return;
         mem[addr] = x;
     }
 
@@ -160,8 +161,9 @@ public:
     }
 
     void show_status(){
-        printf("PC = %#X\n", pc);
-        for (int i = 0; i < 32; i++){
+        cout << "counter : " << counter << endl;
+        printf("PC = %#X\n", prev_pc);
+        for (int i = 31; i >= 0; i--){
             printf("x[%d] = %#X\n", i, reg[i]);
         }
     }
@@ -224,11 +226,11 @@ public:
 
         }else if (opcode == opcode_jalr){
             //JALR
-            prog.next_pc = (prog.pc + IImm.sval()) & 0xfffffffe;
+            prog.next_pc = (prog.reg[rs1] + IImm.sval()) & 0xfffffffe;
             prog.set_reg(rd, prog.pc + 4);
 
         }else if (opcode == opcode_b){
-
+            prog.counter--;
             uint32_t taken = prog.pc + BImm.sval();
             uint32_t untaken = prog.pc + 4;
 
@@ -381,7 +383,7 @@ public:
                 prog.set_reg(rd, (uint32_t )(((int)prog.reg[rs1]) >> (prog.reg[rs2] & 0x0000001f)));
             }
         }
-
+        prog.prev_pc = prog.pc;
         prog.pc = prog.next_pc;
     }
 };
