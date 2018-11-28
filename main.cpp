@@ -24,9 +24,16 @@ int main(){
             inst.show();
             inst.execute(riscv);
             riscv.show_status();
-        }else{
-            break;
-        }
+        }else if (ch == 'j'){
+            int dest;
+            cin >> dest;
+            for (; riscv.counter != dest; ){
+                statement inst = statement(riscv.load_32(riscv.pc));
+                //inst.show();
+                inst.execute(riscv);
+            }
+            riscv.show_status();
+        }else break;
     }
 
     return 0;

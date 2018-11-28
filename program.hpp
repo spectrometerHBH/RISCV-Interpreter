@@ -81,6 +81,7 @@ public:
     uint32_t pc, next_pc;
     uint32_t reg[32];
     uint8_t mem[1 << 17];
+    long long counter = 0;
 
     program() {
         pc = 0;
@@ -205,6 +206,7 @@ public:
     }
 
     void execute(program & prog){
+        prog.counter++;
         prog.next_pc = prog.pc + 4;
 
         if (opcode == opcode_lui){
@@ -281,6 +283,8 @@ public:
 
             }
         }else if (opcode == opcode_s){
+            prog.counter--;
+
             int addr = prog.reg[rs1] + SImm.sval();
             uint32_t data = prog.reg[rs2];
 
