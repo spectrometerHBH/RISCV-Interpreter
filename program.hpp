@@ -2,6 +2,7 @@
 #define _PROGRAM_H_
 
 #include <bitset>
+#include <fstream>
 using namespace std;
 
 
@@ -77,7 +78,7 @@ public:
 
 class program{
 public:
-    uint32_t pc;
+    uint32_t pc, next_pc;
     uint32_t reg[32];
     uint8_t mem[1 << 17];
 
@@ -92,23 +93,35 @@ public:
     }
 
     void prepare_mem(){
-
+        //ifstream fin("/home/spectrometer/Arch2018/riscv/test/test.data");
+        ifstream fin("/home/spectrometer/Chaos/data/test.data");
+        string s;
+        uint32_t addr = 0;
+        while (fin >> s){
+            if (s[0] == '@'){
+                addr = (uint32_t)strtoll(s.substr(1, 8).c_str(), NULL, 16);
+            }else{
+                mem[addr] = (uint8_t)strtoll(s.c_str(), NULL, 16); 
+                addr = addr + 1;
+            }
+        }
+        fin.close();
     }
 
-    uint8_t loadu_8(int addr){
+    uint32_t loadu_8(int addr){
         return mem[addr];
     }
 
-    uint16_t loadu_16(int addr){
+    uint32_t loadu_16(int addr){
         return mem[addr] | (mem[addr + 1] << 8);
     }
 
-    uint8_t load_8(int addr){
+    uint32_t load_8(int addr){
         uint8_t p = (mem[addr] & 0x80) ? 0xff : 0x0;
         return mem[addr] | (p << 8) | (p << 16) | (p << 24);
     }
 
-    uint8_t load_16(int addr){
+    uint32_t load_16(int addr){
         uint8_t p = (mem[addr + 1] & 0x80) ? 0xff : 0x0;
         return mem[addr] | (mem[addr + 1] << 8) | (p << 16) | (p << 24);
     }
@@ -117,20 +130,32 @@ public:
         return mem[addr] | (mem[addr + 1] << 8) | (mem[addr + 2] << 16) | (mem[addr + 3] << 24);
     }
 
+    void mem_w(int addr, uint8_t x){
+        printf("write %#X to mem[%#X]\n", x, addr);
+        mem[addr] = x;
+    }
+
     void save_8(int addr, uint32_t x){
-        mem[addr] = x & 0x000000ff;
+        //mem[addr] = x & 0x000000ff;
+        mem_w(addr, x & 0x000000ff);
     }
 
     void save_16(int addr, uint32_t x){
-        mem[addr]     = x & 0x000000ff;
-        mem[addr + 1] = x & 0x0000ff00;
+        //mem[addr]     = x & 0x000000ff;
+        //mem[addr + 1] = (x & 0x0000ff00) >> 8;
+        mem_w(addr, x & 0x000000ff);
+        mem_w(addr + 1, (x & 0x0000ff00) >> 8);
     }
 
     void save_32(int addr, uint32_t x){
-        mem[addr]     = x & 0x000000ff;
-        mem[addr + 1] = x & 0x0000ff00;
-        mem[addr + 2] = x & 0x00ff0000;
-        mem[addr + 3] = x & 0xff000000;
+        //mem[addr]     = x & 0x000000ff;
+        //mem[addr + 1] = (x & 0x0000ff00) >> 8;
+        //mem[addr + 2] = (x & 0x00ff0000) >> 16;
+        //mem[addr + 3] = (x & 0xff000000) >> 24;
+        mem_w(addr, x & 0x000000ff);
+        mem_w(addr + 1, (x & 0x0000ff00) >> 8);
+        mem_w(addr + 2, (x & 0x00ff0000) >> 16);
+        mem_w(addr + 3, (x & 0xff000000) >> 24);
     }
 
     void show_status(){
@@ -150,9 +175,16 @@ public:
 
     uint32_t cut(int l, int r){
         uint32_t x = 0;
-        for (int i = r; i >= l; i++)
+        for (int i = r; i >= l; i--)
             x = (x << 1) | inst[i];
         return x;
+    }
+
+    void show(){
+        printf("%#X\n", inst.to_ulong());
+        cout << inst << endl;
+        printf("%#X\n", opcode);
+        cout << "rs1, rs2, rd : " << rs1 << " " << rs2 << " " << rd << " " << endl;
     }
 
     statement(uint32_t x) : inst(x){
@@ -173,6 +205,8 @@ public:
     }
 
     void execute(program & prog){
+        prog.next_pc = prog.pc + 4;
+
         if (opcode == opcode_lui){
             //LUI
             prog.set_reg(rd, UImm.uval());
@@ -183,12 +217,12 @@ public:
 
         }else if (opcode == opcode_jal){
             //JAL
-            prog.pc = prog.pc + JImm.sval();
+            prog.next_pc = prog.pc + JImm.sval();
             prog.set_reg(rd, prog.pc + 4);
 
         }else if (opcode == opcode_jalr){
             //JALR
-            prog.pc = (prog.pc + IImm.sval()) & 0xfffffffe;
+            prog.next_pc = (prog.pc + IImm.sval()) & 0xfffffffe;
             prog.set_reg(rd, prog.pc + 4);
 
         }else if (opcode == opcode_b){
@@ -198,27 +232,27 @@ public:
 
             if (funct3 == funct3_beq){
                 //BEQ
-                prog.pc = (prog.reg[rs1] == prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = (prog.reg[rs1] == prog.reg[rs2]) ? taken : untaken;
 
             }else if (funct3 == funct3_bne){
                 //BNE
-                prog.pc = (prog.reg[rs1] != prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = (prog.reg[rs1] != prog.reg[rs2]) ? taken : untaken;
 
             }else if (funct3 == funct3_blt){
                 //BLT
-                prog.pc = ((int)prog.reg[rs1] < (int)prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = ((int)prog.reg[rs1] < (int)prog.reg[rs2]) ? taken : untaken;
 
             }else if (funct3 == funct3_bltu){
                 //BLTU
-                prog.pc = (prog.reg[rs1] < prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = (prog.reg[rs1] < prog.reg[rs2]) ? taken : untaken;
 
             }else if (funct3 == funct3_bge){
                 //BGE
-                prog.pc = ((int)prog.reg[rs1] >= (int)prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = ((int)prog.reg[rs1] >= (int)prog.reg[rs2]) ? taken : untaken;
 
             }else if (funct3 == funct3_bgeu){
                 //BGEU
-                prog.pc = (prog.reg[rs1] >= prog.reg[rs2]) ? taken : untaken;
+                prog.next_pc = (prog.reg[rs1] >= prog.reg[rs2]) ? taken : untaken;
 
             }
 
@@ -343,6 +377,8 @@ public:
                 prog.set_reg(rd, (uint32_t )(((int)prog.reg[rs1]) >> (prog.reg[rs2] & 0x0000001f)));
             }
         }
+
+        prog.pc = prog.next_pc;
     }
 };
 

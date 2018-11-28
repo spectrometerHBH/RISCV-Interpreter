@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include "program.hpp"
 
 using namespace std;
@@ -17,9 +18,10 @@ int main(){
     for (; ;){
         show ("type n to continue/other to exit");
         char ch;
-        scanf("%c\n", ch);
+        cin >> ch;
         if (ch == 'n'){
             statement inst = statement(riscv.load_32(riscv.pc));
+            inst.show();
             inst.execute(riscv);
             riscv.show_status();
         }else{
