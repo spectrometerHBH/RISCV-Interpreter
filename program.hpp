@@ -80,7 +80,7 @@ class program{
 public:
     uint32_t pc, next_pc, prev_pc;
     uint32_t reg[32];
-    uint8_t mem[1 << 17];
+    uint8_t mem[1 << 18];
     long long counter = 0;
 
     program() {
@@ -133,7 +133,7 @@ public:
 
     void mem_w(int addr, uint8_t x){
         printf("write %#X to mem[%#X]\n", x, addr);
-        if (addr >= (1 << 17)) return;
+        if (addr >= (1 << 18)) return;
         mem[addr] = x;
     }
 
